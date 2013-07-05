@@ -12,75 +12,138 @@
 
 #include "Statement.h"
 
+namespace SQLite {
 
-namespace SQLite
-{
+	// Open the provided database UTF-8 filename with SQLITE_OPEN_xxx provided flags.
+	Database::Database(const char*apFilename,
+		const int aFlags /* = SQLITE_OPEN_READONLY */ ) :
 
+	// throw(SQLite::Exception)
+	mpSQLite(NULL), mFilename(apFilename), closed(false) {
+		int ret = sqlite3_open_v2(apFilename, &mpSQLite, aFlags, NULL);
+		if (SQLITE_OK != ret) {
+			std::string strerr = sqlite3_errmsg(mpSQLite);
+			sqlite3_close(mpSQLite); // close is required even in case of error on opening
+			throw SQLite::Exception(strerr);
+		}
+	}
 
-// Open the provided database UTF-8 filename with SQLITE_OPEN_xxx provided flags.
-Database::Database(const char* apFilename, const int aFlags /*= SQLITE_OPEN_READONLY*/) : // throw(SQLite::Exception)
-    mpSQLite(NULL),
-    mFilename(apFilename)
-{
-    int ret = sqlite3_open_v2(apFilename, &mpSQLite, aFlags, NULL);
-    if (SQLITE_OK != ret)
-    {
-        std::string strerr = sqlite3_errmsg(mpSQLite);
-        sqlite3_close(mpSQLite); // close is required even in case of error on opening
-        throw SQLite::Exception(strerr);
-    }
-}
+	// Default constructor
+	Database::Database(void) : mpSQLite(NULL), mFilename(""), closed(true) {
+		// Intentionaly Left Blank
+	}
 
-// Close the SQLite database connection.
-Database::~Database(void) throw() // nothrow
-{
-    int ret = sqlite3_close(mpSQLite);
-    // Never throw an exception in a destructor
-    //std::cout << sqlite3_errmsg(mpSQLite) << std::endl;
-    SQLITE_CPP_ASSERT (SQLITE_OK == ret);
-}
+	// Close the SQLite database connection.
+	Database::~Database(void)throw() // nothrow
+	{
+		if (!closed) {
+			int ret = sqlite3_close(mpSQLite);
+			// Never throw an exception in a destructor
+			// std::cout << sqlite3_errmsg(mpSQLite) << std::endl;
+			SQLITE_CPP_ASSERT(SQLITE_OK == ret);
+		}
+	}
 
-// Shortcut to execute one or multiple SQL statements without results (UPDATE, INSERT, ALTER, COMMIT...).
-int Database::exec(const char* apQueries) // throw(SQLite::Exception);
-{
-    int ret = sqlite3_exec(mpSQLite, apQueries, NULL, NULL, NULL);
-    check(ret);
+	// Close method
+	bool Database::close(void)throw() { // nothrow
+		if (!closed) {
+			int ret = sqlite3_close(mpSQLite);
+			// Never throw an exception in a destructor
+			// std::cout << sqlite3_errmsg(mpSQLite) << std::endl;
+			SQLITE_CPP_ASSERT(SQLITE_OK == ret);
+			closed = true;
+		}
+	}
 
-    // Return the number of rows modified by those SQL statements (INSERT, UPDATE or DELETE)
-    return sqlite3_changes(mpSQLite);
-}
+	// Open Method
+	bool Database::open(const char*apFilename, const int aFlags) {
+		mFilename = apFilename;
+		int ret = sqlite3_open_v2(apFilename, &mpSQLite, aFlags, NULL);
+		if (SQLITE_OK != ret) {
+			std::string strerr = sqlite3_errmsg(mpSQLite);
+			sqlite3_close(mpSQLite); // close is required even in case of error on opening
+			throw SQLite::Exception(strerr);
+		}
+		closed = false;
+	}
 
-// Shortcut to execute a one step query and fetch the first column of the result.
-// WARNING: Be very careful with this dangerous method: you have to
-// make a COPY OF THE result, else it will be destroy before the next line
-// (when the underlying temporary Statement and Column objects are destroyed)
-// this is an issue only for pointer type result (ie. char* and blob)
-// (use the Column copy-constructor)
-Column Database::execAndGet(const char* apQuery) // throw(SQLite::Exception)
-{
-    Statement query(*this, apQuery);
-    (void)query.executeStep(); // Can return false if no result, which will throw next line in getColumn()
-    return query.getColumn(0);
-}
+	// Open Method
+	bool Database::open(const std::string apFilename, const int aFlags) {
+		mFilename = apFilename;
+		int ret = sqlite3_open_v2(apFilename.c_str(), &mpSQLite, aFlags, NULL);
+		if (SQLITE_OK != ret) {
+			std::string strerr = sqlite3_errmsg(mpSQLite);
+			sqlite3_close(mpSQLite); // close is required even in case of error on opening
+			throw SQLite::Exception(strerr);
+		}
+		closed = false;
+	}
 
-// Shortcut to test if a table exists.
-bool Database::tableExists(const char* apTableName) // throw(SQLite::Exception)
-{
-    Statement query(*this, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?");
-    query.bind(1, apTableName);
-    (void)query.executeStep(); // Cannot return false, as the above query always return a result
-    int Nb = query.getColumn(0);
-    return (1 == Nb);
-}
+	// Shortcut to execute one or multiple SQL statements without results (UPDATE, INSERT, ALTER, COMMIT...).
+	int Database::exec(const char* apQueries) // throw(SQLite::Exception);
+	{
+		int ret = sqlite3_exec(mpSQLite, apQueries, NULL, NULL, NULL);
+		check(ret);
 
-// Check if aRet equal SQLITE_OK, else throw a SQLite::Exception with the SQLite error message
-void Database::check(const int aRet) const // throw(SQLite::Exception)
-{
-    if (SQLITE_OK != aRet)
-    {
-        throw SQLite::Exception(sqlite3_errmsg(mpSQLite));
-    }
-}
+		// Return the number of rows modified by those SQL statements (INSERT, UPDATE or DELETE)
+		return sqlite3_changes(mpSQLite);
+	}
 
+	// Shortcut to execute one or multiple SQL statements without results (UPDATE, INSERT, ALTER, COMMIT...).
+	int Database::exec(const std::string apQueries) // throw(SQLite::Exception);
+	{
+		int ret = sqlite3_exec(mpSQLite, apQueries.c_str(), NULL, NULL, NULL);
+		check(ret);
 
-}  // namespace SQLite
+		// Return the number of rows modified by those SQL statements (INSERT, UPDATE or DELETE)
+		return sqlite3_changes(mpSQLite);
+	}
+
+	// Shortcut to execute a one step query and fetch the first column of the result.
+	// WARNING: Be very careful with this dangerous method: you have to
+	// make a COPY OF THE result, else it will be destroy before the next line
+	// (when the underlying temporary Statement and Column objects are destroyed)
+	// this is an issue only for pointer type result (ie. char* and blob)
+	// (use the Column copy-constructor)
+	Column Database::execAndGet(const char* apQuery) // throw(SQLite::Exception)
+	{
+		Statement query(*this, apQuery);
+		(void)query.executeStep(); // Can return false if no result, which will throw next line in getColumn()
+		return query.getColumn(0);
+	}
+
+	// Shortcut to execute a one step query and fetch the first column of the result.
+	// WARNING: Be very careful with this dangerous method: you have to
+	// make a COPY OF THE result, else it will be destroy before the next line
+	// (when the underlying temporary Statement and Column objects are destroyed)
+	// this is an issue only for pointer type result (ie. char* and blob)
+	// (use the Column copy-constructor)
+	Column Database::execAndGet(const std::string apQuery)
+	// throw(SQLite::Exception)
+	{
+		Statement query(*this, apQuery);
+		(void)query.executeStep(); // Can return false if no result, which will throw next line in getColumn()
+		return query.getColumn(0);
+	}
+
+	// Shortcut to test if a table exists.
+	bool Database::tableExists(const char* apTableName)
+	// throw(SQLite::Exception)
+	{
+		Statement query(*this,
+			"SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?");
+		query.bind(1, apTableName);
+		(void)query.executeStep(); // Cannot return false, as the above query always return a result
+		int Nb = query.getColumn(0);
+		return(1 == Nb);
+	}
+
+	// Check if aRet equal SQLITE_OK, else throw a SQLite::Exception with the SQLite error message
+	void Database::check(const int aRet)const // throw(SQLite::Exception)
+	{
+		if (SQLITE_OK != aRet) {
+			throw SQLite::Exception(sqlite3_errmsg(mpSQLite));
+		}
+	}
+
+} // namespace SQLite
