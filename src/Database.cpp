@@ -53,6 +53,7 @@ namespace SQLite {
 			SQLITE_CPP_ASSERT(SQLITE_OK == ret);
 			closed = true;
 		}
+        return closed;
 	}
 
 	// Open Method
@@ -65,6 +66,7 @@ namespace SQLite {
 			throw SQLite::Exception(strerr);
 		}
 		closed = false;
+        return(!closed);
 	}
 
 	// Open Method
@@ -77,6 +79,7 @@ namespace SQLite {
 			throw SQLite::Exception(strerr);
 		}
 		closed = false;
+        return(!closed);
 	}
 
 	// Shortcut to execute one or multiple SQL statements without results (UPDATE, INSERT, ALTER, COMMIT...).
