@@ -72,8 +72,10 @@ namespace SQLite {
 		 *
 		 * All SQLite statements must have been finalized before,
 		 * so all Statement objects must have been unregistered.
+		 *
+		 * @return true if database sucessfuly closed, false otherwise.
 		 */
-		bool close(void)throw();
+		bool close(void)throw(); // nothrow
 
 		/**
 		 * @brief Open the provided database UTF-8 filename.
@@ -90,8 +92,9 @@ namespace SQLite {
 		 */
 		bool open(const char* apFilename,
 			const int aFlags = SQLITE_OPEN_READONLY);
+			// throw(SQLite::Exception);
 
-				/**
+		/**
 		 * @brief Open the provided database UTF-8 filename.
 		 *
 		 * Uses sqlite3_open_v2() with readonly default flag, which is the opposite behavior
@@ -106,6 +109,7 @@ namespace SQLite {
 		 */
 		bool open(const std::string apFilename,
 			const int aFlags = SQLITE_OPEN_READONLY);
+			// throw(SQLite::Exception);
 
 		/**
 		 * @brief Shortcut to execute one or multiple statements without results.
@@ -251,6 +255,10 @@ namespace SQLite {
 		// !< Pointer to SQLite Database Connection Handle
 		std::string mFilename; // !< UTF-8 filename used to open the database
 
+		/**
+		 * @brief this will be true if this class has no link to open sqlite
+		 *	 database file
+		 */
 		bool closed;
 	};
 
